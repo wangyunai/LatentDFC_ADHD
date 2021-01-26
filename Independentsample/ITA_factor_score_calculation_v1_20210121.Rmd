@@ -1,0 +1,699 @@
+---
+title: "ITA Additional Analysis"
+author: "Yun Wang"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = "", warning = TRUE, message = FALSE, echo = TRUE, tidy = TRUE, size="small")
+options(width = 3500)
+rm(list=ls())
+library(lavaan)
+library(readxl)
+library(dplyr)
+library(psych)
+library(table1)
+library(corrplot)
+library(sjPlot)
+library(lmerTest)
+library(lavaanPlot)
+library(formatR)
+library(kableExtra)
+```
+
+* Data Load
+```{r}
+set.seed(45)
+#setwd("/Users/posnerlab/Dropbox (NYSPI)/ITA_Manuscript/Data/Latentanalysis/Data")
+itadat.sc=read_xlsx('ITA_All_1002.xlsx',sheet=1) #%>%  rename(Gender=Gender_x)
+itadat.sc<- itadat.sc #%>% select(-contains("Caudate"))%>% select(-contains("Putamen"))%>% select(-contains("VS"))
+
+names(itadat.sc)=gsub(":","_",names(itadat.sc))
+names(itadat.sc)=gsub("-","_",names(itadat.sc))
+
+itadat.dc=read_xlsx('ITA_All_1002.xlsx',sheet=2)
+itadat.dc<- itadat.dc #%>% select(-contains("Caudate"))%>% select(-contains("Putamen"))%>% select(-contains("VS"))
+
+names(itadat.dc)=gsub(":","_",names(itadat.dc))
+names(itadat.dc)=gsub("-","_",names(itadat.dc))
+
+names(itadat.sc)[11:50]<-paste('SFC_',names(itadat.sc)[11:50],sep='')
+
+names(itadat.dc)[19:36]<-paste('DFC_',names(itadat.dc)[19:36],sep='')
+#head(itadat.dc[,1:10])
+#head(itadat.sc[,1:10])
+ita = merge(itadat.sc, itadat.dc, all=TRUE) %>% mutate(medication_binary=as.numeric(as.factor(Medication))-1) 
+names(ita)=gsub(" ","",names(ita))
+```
+
+
+* Simplify the variable names 
+```{r}
+ita1=ita %>% 
+  mutate(EmoLia_t1=T1_EmotionLability,EmoLia_t2=T2_EmotionLability,
+         INATT_t1=T1_Inattention,INATT_t2=T2_Inattention,
+         HYPER_t1=T1_Hyperactivity,HYPER_t2=T2_Hyperactivity) %>%
+  mutate(
+    Thal_SFC_v1_t1= SFC_Thalamus_Motor_L_to_Left_Precuneous_Cortex_t1 ,
+Thal_SFC_v1_t2=  SFC_Thalamus_Motor_L_to_Left_Precuneous_Cortex_t2 ,
+Thal_SFC_v2_t1=  SFC_Thalamus_Motor_L_to_Left_Superior_Frontal_Gyrus_t1   ,
+Thal_SFC_v2_t2=  SFC_Thalamus_Motor_L_to_Left_Superior_Frontal_Gyrus_t2   ,
+Thal_SFC_v3_t1=  SFC_Thalamus_Motor_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Thal_SFC_v3_t2=  SFC_Thalamus_Motor_R_to_Right_Superior_Frontal_Gyrus_t2 ,
+Thal_SFC_v4_t1=  SFC_Thalamus_Motor_R_to_Left_Superior_Frontal_Gyrus_t1   ,
+Thal_SFC_v4_t2=  SFC_Thalamus_Motor_R_to_Left_Superior_Frontal_Gyrus_t2   ,
+Thal_SFC_v5_t1=  SFC_Thalamus_Parietal_Occipital_R_to_Left_Lateral_Occipital_Cortex_superior_division_t1 ,
+Thal_SFC_v5_t2=  SFC_Thalamus_Parietal_Occipital_R_to_Left_Lateral_Occipital_Cortex_superior_division_t2 ,
+Thal_SFC_v6_t1=  SFC_Thalamus_Somantosensory_R_to_Left_Superior_Frontal_Gyrus_t1  ,
+Thal_SFC_v6_t2=  SFC_Thalamus_Somantosensory_R_to_Left_Superior_Frontal_Gyrus_t2  ,
+
+Thal_DFC_v5_t2= DFC_Thalamus_Motor_L_to_Left_Lingual_Gyrus_t2,
+Thal_DFC_v6_t2= DFC_Thalamus_Parietal_Occipital_L_to_Right_Middle_Frontal_Gyrus_t2,
+Thal_DFC_v7_t2= DFC_Thalamus_Parietal_Occipital_R_to_Right_Superior_Frontal_Gyrus_t2,
+Thal_DFC_v8_t2= DFC_Thalamus_Prefrontal_L_to_Right_Middle_Temporal_Gyrus_posterior_division_t2,
+Thal_DFC_v9_t2= DFC_Thalamus_Temporal_L_to_Right_Middle_Frontal_Gyrus_t2,
+Thal_DFC_v5_t1= DFC_Thalamus_Motor_L_to_Left_Lingual_Gyrus_t1,
+Thal_DFC_v6_t1= DFC_Thalamus_Parietal_Occipital_L_to_Right_Middle_Frontal_Gyrus_t1,
+Thal_DFC_v7_t1= DFC_Thalamus_Parietal_Occipital_R_to_Right_Superior_Frontal_Gyrus_t1,
+Thal_DFC_v8_t1= DFC_Thalamus_Prefrontal_L_to_Right_Middle_Temporal_Gyrus_posterior_division_t1,
+Thal_DFC_v9_t1= DFC_Thalamus_Temporal_L_to_Right_Middle_Frontal_Gyrus_t1,
+
+Stra_SFC_v1_t1= SFC_Caudate_Ca_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v1_t2=  SFC_Caudate_Ca_R_to_Right_Superior_Frontal_Gyrus_t2 ,
+Stra_SFC_v2_t1=  SFC_Putamen_Pa_L_to_Right_Middle_Frontal_Gyrus_t1   ,
+Stra_SFC_v2_t2=  SFC_Putamen_Pa_L_to_Right_Middle_Frontal_Gyrus_t2   ,
+Stra_SFC_v3_t1=  SFC_Putamen_Pa_L_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v3_t2=  SFC_Putamen_Pa_L_to_Right_Superior_Frontal_Gyrus_t2 ,
+Stra_SFC_v4_t1=  SFC_Putamen_Pa_R_to_Right_Precentral_Gyrus_t1   ,
+Stra_SFC_v4_t2=  SFC_Putamen_Pa_R_to_Right_Precentral_Gyrus_t2   ,
+Stra_SFC_v5_t1=  SFC_Putamen_Pa_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v5_t2=  SFC_Putamen_Pa_R_to_Right_Superior_Frontal_Gyrus_t2 ,
+Stra_SFC_v6_t1=  SFC_Putamen_Pp_L_to_Left_Superior_Frontal_Gyrus_t1  ,
+Stra_SFC_v6_t2=  SFC_Putamen_Pp_L_to_Left_Superior_Frontal_Gyrus_t2  ,
+Stra_SFC_v7_t1=  SFC_Putamen_Pp_L_to_Left_Middle_Frontal_Gyrus_t1    ,
+Stra_SFC_v7_t2=  SFC_Putamen_Pp_L_to_Left_Middle_Frontal_Gyrus_t2    ,
+Stra_SFC_v8_t1=  SFC_Putamen_Pp_L_to_Right_Middle_Frontal_Gyrus_t1   ,
+Stra_SFC_v8_t2=  SFC_Putamen_Pp_L_to_Right_Middle_Frontal_Gyrus_t2   ,
+Stra_SFC_v9_t1=  SFC_Putamen_Pp_L_to_Left_Lateral_Occipital_Cortex_superior_division_t1  ,
+Stra_SFC_v9_t2=  SFC_Putamen_Pp_L_to_Left_Lateral_Occipital_Cortex_superior_division_t2  ,
+Stra_SFC_v10_t1= SFC_Putamen_Pp_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v10_t2= SFC_Putamen_Pp_R_to_Right_Superior_Frontal_Gyrus_t2 ,
+Stra_SFC_v11_t1= SFC_Putamen_Pp_R_to_Right_Precentral_Gyrus_t1   ,
+Stra_SFC_v11_t2= SFC_Putamen_Pp_R_to_Right_Precentral_Gyrus_t2   ,
+Stra_SFC_v12_t1= SFC_Putamen_Pp_R_to_Left_Precentral_Gyrus_t1    ,
+Stra_SFC_v12_t2= SFC_Putamen_Pp_R_to_Left_Precentral_Gyrus_t2    ,
+Stra_SFC_v13_t1= SFC_Putamen_Pp_R_to_Left_Middle_Frontal_Gyrus_t1    ,
+Stra_SFC_v13_t2= SFC_Putamen_Pp_R_to_Left_Middle_Frontal_Gyrus_t2    ,
+Stra_SFC_v14_t1= SFC_Putamen_Pp_R_to_Left_Frontal_Pole_t1    ,
+Stra_SFC_v14_t2= SFC_Putamen_Pp_R_to_Left_Frontal_Pole_t2    ,
+Stra_DFC_v1_t2=  DFC_Caudate_Cp_L_to_Left_Occipital_Pole_t2  ,
+Stra_DFC_v2_t2=  DFC_VS_L_to_Right_Pallidum_t2   ,
+Stra_DFC_v3_t2=  DFC_VS_R_to_Right_Supramarginal_Gyrus_anterior_division_t2  ,
+Stra_DFC_v4_t2=  DFC_VS_R_to_Left_Frontal_Orbital_Cortex_t2  ,
+Stra_DFC_v1_t1=  DFC_Caudate_Cp_L_to_Left_Occipital_Pole_t1  ,
+Stra_DFC_v2_t1=  DFC_VS_L_to_Right_Pallidum_t1   ,
+Stra_DFC_v3_t1=  DFC_VS_R_to_Right_Supramarginal_Gyrus_anterior_division_t1  ,
+Stra_DFC_v4_t1=  DFC_VS_R_to_Left_Frontal_Orbital_Cortex_t1
+)
+ita1$Gender.f=factor(ita1$Gender)
+
+## Standardization
+ita2<-ita1
+
+varnames= c(paste('Thal_SFC_v',1:6,sep=''),paste('Thal_DFC_v',5:9,sep=''),
+            paste('Stra_SFC_v',1:14,sep=''),paste('Stra_DFC_v',1:4,sep=''))
+for (var in varnames){
+  eval(parse(text=paste('ita2$',var,'_t1 = scale(ita2$',var,'_t1)',sep='')))
+  eval(parse(text=paste('tmp.mean=attr(ita2$',var,'_t1,"scaled:center")',sep='')))
+  eval(parse(text=paste('tmp.sd=attr(ita2$',var,'_t1,"scaled:scale")',sep='')))
+  eval(parse(text=paste('ita2$',var,'_t2 = (ita2$',var,'_t2 - tmp.mean)/tmp.sd',sep='')))
+}
+
+ 
+```
+
+
+# SEM {.tabset}
+
+
+## rawscores 
+```{r}
+
+library(reshape2)
+tab_model(lmer(value ~ time*Medication + (1|ID),ita %>% select(ID,Medication,T1_Inattention,T2_Inattention) %>% melt(.,id=c('ID','Medication')) %>% mutate(time=factor(as.numeric(variable)))),
+lmer(value ~ time*Medication + (1|ID),ita %>% select(ID,Medication,T1_Hyperactivity,T2_Hyperactivity) %>% melt(.,id=c('ID','Medication')) %>% mutate(time=factor(as.numeric(variable)))),
+        lmer(value ~ time*Medication + (1|ID),ita %>% select(ID,Medication,T1_EmotionLability,T2_EmotionLability) %>% melt(.,id=c('ID','Medication')) %>% mutate(time=factor(as.numeric(variable)))),
+dv.labels = c('Inattention','Hyperactivity','Emotion Lability'))
+```
+
+## DFC {.tabset}
+
+
+
+## LCA models {.tabset}
+
+### DFC SEM {.tabset}
+```{r}
+source('/Users/posnerlab/Dropbox (NYSPI)/ITA_Manuscript/Data/latentanalysis_update/lcsa_models_combined.R')
+
+
+fit.dfc<- lavaan(model.st.dfc, data=ita2, std.lv=TRUE,missing='fiml')#,estimator='mlr')
+
+summary(fit.dfc, fit.measures=TRUE, standardized=TRUE, rsquare=TRUE)
+
+kable(parameterestimates(fit.dfc, standardized=TRUE) %>% filter(op=='~' | op==':=') %>% 
+        filter(est != 1) %>% select(label,est,se,z,pvalue,ci.lower,ci.upper,std.all),digits=3) %>%
+  kable_styling("bordered")
+```
+
+### Striatum and thalamus SFC {.tabset}
+
+```{r}
+fit.sfc<- lavaan(model.st.separatesfc, data=ita2, std.lv=TRUE,missing='fiml')#,estimator='mlr')
+summary(fit.sfc, fit.measures=TRUE, standardized=TRUE, rsquare=TRUE)
+
+
+kable(parameterestimates(fit.sfc, standardized=TRUE) %>% filter(op=='~' | op==':=') %>%
+       filter(est != 1) %>% select(lhs,op,rhs, label,est,se,z,pvalue,ci.lower,ci.upper,std.all),digits=3) %>%
+kable_styling("bordered")
+
+```
+
+# Figures and Replication Effect Size caculation  {.tabset}
+## Factor score computation for all 3 studies {.tabset}
+
+```{r}
+library(MatchIt)
+
+others.sc=read_xlsx('Other_All_0121_corrected.xlsx',sheet=1) #%>%  rename(Gender=Gender_x)
+names(others.sc)=gsub(":","_",names(others.sc))
+names(others.sc)=gsub("-","_",names(others.sc))
+
+others.dc=read_xlsx('Other_All_0121_corrected.xlsx',sheet=2)
+names(others.dc)=gsub(":","_",names(others.dc))
+names(others.dc)=gsub("-","_",names(others.dc))
+
+names(others.sc)[-c(1:6)]<-paste('SFC_',names(others.sc)[-c(1:6)],sep='')
+names(others.dc)[-c(1:6)]<-paste('DFC_',names(others.dc)[-c(1:6)],sep='')
+#head(itadat.dc[,1:10])
+#head(itadat.sc[,1:10])
+
+others = merge(others.sc, others.dc, all.x=TRUE) #%>% mutate(medication_binary=as.numeric(as.factor(Group))-1) 
+names(others)=gsub(" ","",names(others))
+
+
+itatmp=ita1 %>% rename(Group=Medication)
+itatmp.1 = itatmp[,names(others)[-c(2,4)]]
+
+allvarlist = names(ita1)
+t2varlist = allvarlist[grep('_t2', allvarlist)][1:29]
+itatmp.2 = itatmp[,c('ID','Group','Gender','Age',t2varlist)]
+names(itatmp.2)<- gsub('_t2','_t1',names(itatmp.2))
+itatmp.2 = itatmp.2[,names(others)[-c(2,4)]]
+
+ita.long = rbind(
+  data.frame(itatmp.1, Time='T1', Study='RCT'),
+  data.frame(itatmp.2, Time='T2', Study='RCT')
+) %>% mutate(new.group = paste(Group, Time))
+
+tmp = others %>% mutate(new.group=Group)
+
+  #select(-Gender,-Age)
+others1 = rbind(
+  tmp,
+  ita.long[,names(tmp)])%>% 
+  mutate(EmoLia_t1=rnorm(nrow(.)),EmoLia_t2=rnorm(nrow(.)),
+         INATT_t1=rnorm(nrow(.)),INATT_t2=rnorm(nrow(.)),
+         HYPER_t1=rnorm(nrow(.)),HYPER_t2=rnorm(nrow(.)),
+         medication_binary=0
+         ) %>%mutate(
+   Thal_SFC_v1_t1= SFC_Thalamus_Motor_L_to_Left_Precuneous_Cortex_t1 ,
+Thal_SFC_v2_t1=  SFC_Thalamus_Motor_L_to_Left_Superior_Frontal_Gyrus_t1   ,
+Thal_SFC_v3_t1=  SFC_Thalamus_Motor_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Thal_SFC_v4_t1=  SFC_Thalamus_Motor_R_to_Left_Superior_Frontal_Gyrus_t1   ,
+Thal_SFC_v5_t1=  SFC_Thalamus_Parietal_Occipital_R_to_Left_Lateral_Occipital_Cortex_superior_division_t1 ,
+Thal_SFC_v6_t1=  SFC_Thalamus_Somantosensory_R_to_Left_Superior_Frontal_Gyrus_t1  ,
+
+Thal_DFC_v5_t1= DFC_Thalamus_Motor_L_to_Left_Lingual_Gyrus_t1,
+Thal_DFC_v6_t1= DFC_Thalamus_Parietal_Occipital_L_to_Right_Middle_Frontal_Gyrus_t1,
+Thal_DFC_v7_t1= DFC_Thalamus_Parietal_Occipital_R_to_Right_Superior_Frontal_Gyrus_t1,
+Thal_DFC_v8_t1= DFC_Thalamus_Prefrontal_L_to_Right_Middle_Temporal_Gyrus_posterior_division_t1,
+Thal_DFC_v9_t1= DFC_Thalamus_Temporal_L_to_Right_Middle_Frontal_Gyrus_t1,
+
+Stra_SFC_v1_t1=  SFC_Caudate_Ca_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v2_t1=  SFC_Putamen_Pa_L_to_Right_Middle_Frontal_Gyrus_t1   ,
+Stra_SFC_v3_t1=  SFC_Putamen_Pa_L_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v4_t1=  SFC_Putamen_Pa_R_to_Right_Precentral_Gyrus_t1   ,
+Stra_SFC_v5_t1=  SFC_Putamen_Pa_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v6_t1=  SFC_Putamen_Pp_L_to_Left_Superior_Frontal_Gyrus_t1  ,
+Stra_SFC_v7_t1=  SFC_Putamen_Pp_L_to_Left_Middle_Frontal_Gyrus_t1    ,
+Stra_SFC_v8_t1=  SFC_Putamen_Pp_L_to_Right_Middle_Frontal_Gyrus_t1   ,
+Stra_SFC_v9_t1=  SFC_Putamen_Pp_L_to_Left_Lateral_Occipital_Cortex_superior_division_t1  ,
+Stra_SFC_v10_t1= SFC_Putamen_Pp_R_to_Right_Superior_Frontal_Gyrus_t1 ,
+Stra_SFC_v11_t1= SFC_Putamen_Pp_R_to_Right_Precentral_Gyrus_t1   ,
+Stra_SFC_v12_t1= SFC_Putamen_Pp_R_to_Left_Precentral_Gyrus_t1    ,
+Stra_SFC_v13_t1= SFC_Putamen_Pp_R_to_Left_Middle_Frontal_Gyrus_t1    ,
+Stra_SFC_v14_t1= SFC_Putamen_Pp_R_to_Left_Frontal_Pole_t1    ,
+
+Stra_DFC_v1_t1=  DFC_Caudate_Cp_L_to_Left_Occipital_Pole_t1  ,
+Stra_DFC_v2_t1=  DFC_VS_L_to_Right_Pallidum_t1   ,
+Stra_DFC_v3_t1=  DFC_VS_R_to_Right_Supramarginal_Gyrus_anterior_division_t1  ,
+Stra_DFC_v4_t1=  DFC_VS_R_to_Left_Frontal_Orbital_Cortex_t1) %>%
+  mutate(
+    Thal_SFC_v1_t2=  Thal_SFC_v1_t1 ,
+Thal_SFC_v2_t2=  Thal_SFC_v2_t1   ,
+Thal_SFC_v3_t2=  Thal_SFC_v3_t1 ,
+Thal_SFC_v4_t2=  Thal_SFC_v4_t1   ,
+Thal_SFC_v5_t2=  Thal_SFC_v5_t1 ,
+Thal_SFC_v6_t2=  Thal_SFC_v6_t1  ,
+
+Thal_DFC_v5_t2= Thal_DFC_v5_t1,
+Thal_DFC_v6_t2= Thal_DFC_v6_t1,
+Thal_DFC_v7_t2= Thal_DFC_v7_t1,
+Thal_DFC_v8_t2= Thal_DFC_v8_t1,
+Thal_DFC_v9_t2= Thal_DFC_v9_t1,
+Stra_SFC_v1_t2=  Stra_SFC_v1_t1 ,
+Stra_SFC_v2_t2=  Stra_SFC_v2_t1   ,
+Stra_SFC_v3_t2=  Stra_SFC_v3_t1 ,
+Stra_SFC_v4_t2=  Stra_SFC_v4_t1   ,
+Stra_SFC_v5_t2=  Stra_SFC_v5_t1 ,
+Stra_SFC_v6_t2=  Stra_SFC_v6_t1  ,
+Stra_SFC_v7_t2=  Stra_SFC_v7_t1    ,
+Stra_SFC_v8_t2=  Stra_SFC_v8_t1   ,
+Stra_SFC_v9_t2=  Stra_SFC_v9_t1  ,
+Stra_SFC_v10_t2= Stra_SFC_v10_t1 ,
+Stra_SFC_v11_t2= Stra_SFC_v11_t1   ,
+Stra_SFC_v12_t2= Stra_SFC_v12_t1    ,
+Stra_SFC_v13_t2= Stra_SFC_v13_t1    ,
+Stra_SFC_v14_t2= Stra_SFC_v14_t1    ,
+
+Stra_DFC_v1_t2=  Stra_DFC_v1_t1  ,
+Stra_DFC_v2_t2=  Stra_DFC_v2_t1   ,
+Stra_DFC_v3_t2=  Stra_DFC_v3_t1  ,
+Stra_DFC_v4_t2=  Stra_DFC_v4_t1 
+)
+
+others1$Study[others1$Study=='HC']<-'NYSPI'
+
+others1$Gender=factor(others1$Gender)
+
+others1 <-others1 
+
+```
+
+## Matching ABCD sample {.tabset}
+
+```{r}
+library(MatchIt)
+ab<-others1 %>% filter(Study=='ABCD') %>% filter(Group!='ABCD_with_meds_plus')
+#abcd$Group=factor(abcd$Group)
+ab_binary<-ab %>% mutate(Group=factor(Group, levels=c('ABCD_no_meds', 'ABCD_with_meds'),
+                labels=c(0,1)))
+ab_binary$Group<-as.numeric(ab_binary$Group)
+ab_binary$Group = ab_binary$Group -1
+m.out <-matchit(Group ~ Age+Gender,data=ab_binary)
+plot(summary(m.out))
+control_index=as.numeric(m.out$match.matrix[,1])
+adhd_index=as.numeric(rownames((m.out$match.matrix)))
+index1=c(control_index,adhd_index)
+index=index1+253
+index_all=c(1:253,index,357:454)
+others11<-others1[index_all,]
+
+others1 <- others11
+```
+
+
+
+
+
+```{r}
+## standardize
+varnames= c(paste('Thal_SFC_v',1:6,sep=''),paste('Thal_DFC_v',5:9,sep=''),
+            paste('Stra_SFC_v',1:14,sep=''),paste('Stra_DFC_v',1:4,sep=''))
+
+for (var in varnames){
+  eval(parse(text=paste('others1$',var,'_t1 = as.numeric(others1$',var,'_t1)',sep='')))
+  eval(parse(text=paste('others1$',var,'_t2 = as.numeric(others1$',var,'_t2)',sep='')))
+
+}
+
+for (var in varnames){
+  eval(parse(text=paste('tmp.mean=attr(ita2$',var,'_t1,"scaled:center")',sep='')))
+  eval(parse(text=paste('tmp.sd=attr(ita2$',var,'_t1,"scaled:scale")',sep='')))
+  eval(parse(text=paste('others1$',var,'_t1 = (others1$',var,'_t1 - tmp.mean)/tmp.sd',sep='')))
+  eval(parse(text=paste('others1$',var,'_t2 = (others1$',var,'_t2 - tmp.mean)/tmp.sd',sep='')))
+}
+
+others2=data.frame(others1[,c(1:6)],
+  dfc.only=lavPredict(fit.dfc, newdata=others1,method='regression', ) %>% 
+    data.frame(.) %>% select(DFC_T1),
+  striatum.sfc=lavPredict(fit.sfc, newdata=others1,method='regression', ) %>% 
+    data.frame(.) %>% select(Str_SFC_T1,Tha_SFC_T1)) %>%
+ # thalamus.sfc=lavPredict(fit.thalamus.sfc, newdata=others1,method='regression', ) %>% 
+   # data.frame(.) %>% select(SFC_T1)) %>%
+  mutate(groups = paste(Study,Group,sep=''))
+
+tmp=data.frame(lavPredict(fit.dfc,append.data = TRUE))
+
+rct = others2 %>% filter(Study=='RCT' | Study == 'NYSPI')
+
+t1means=rct %>% filter(Study=='RCT' & Time=='T1')%>%
+  select(DFC_T1, striatum.sfc.Str_SFC_T1,striatum.sfc.Tha_SFC_T1) %>% 
+  describe(.) %>%
+  select(mean,sd)
+
+rct2 = rct  %>%
+  mutate(DFC = (DFC_T1 - t1means$mean[1])/t1means$sd[1], 
+         striatum.SFC = (striatum.sfc.Str_SFC_T1 - t1means$mean[2])/t1means$sd[2], 
+         thalamus.SFC = (striatum.sfc.Tha_SFC_T1 - t1means$mean[3])/t1means$sd[3])
+
+
+nomedmeans=others2 %>% filter(Study=='ABCD' & Group=='ABCD_no_meds') %>% 
+  select(DFC_T1, striatum.sfc.Str_SFC_T1,striatum.sfc.Tha_SFC_T1) %>% 
+  describe(.) %>%
+  select(mean,sd)
+  
+abcd = others2 %>% filter(Study=='ABCD' ) %>% 
+  mutate(DFC = (DFC_T1 - t1means$mean[1])/t1means$sd[1], 
+                striatum.SFC = (striatum.sfc.Str_SFC_T1 - t1means$mean[2])/t1means$sd[2], 
+         thalamus.SFC = (striatum.sfc.Tha_SFC_T1 - t1means$mean[3])/t1means$sd[3]) %>%
+  mutate(Group=factor(Group, levels=c('ABCD_no_meds', 'ABCD_with_meds'),
+                labels=c('No Med.','Med.')))
+
+
+nomedmeans=others2 %>% filter(Study=='ADHD200-NYU' & Group=='ADHD') %>% 
+  select(DFC_T1, striatum.sfc.Str_SFC_T1,striatum.sfc.Tha_SFC_T1) %>% 
+  describe(.) %>%
+  select(mean,sd)
+
+nyu = others2 %>% filter(Study=='ADHD200-NYU' ) %>%
+  mutate(DFC = (DFC_T1 - t1means$mean[1])/t1means$sd[1], 
+           striatum.SFC = (striatum.sfc.Str_SFC_T1 - t1means$mean[2])/t1means$sd[2], 
+         thalamus.SFC = (striatum.sfc.Tha_SFC_T1 - t1means$mean[3])/t1means$sd[3])
+
+
+library(ggplot2)
+library(gridExtra)
+```
+
+## Rawscores plot  {.tabset}
+```{r, warning=FALSE,message=FALSE,fig.width=10,fig.height=10}
+# ggplot(melt(others1[,c(1,2,5:24,34)], id=c('ID','Study','new.group')),
+#        aes(x=new.group,y=value, colour=new.group)) +
+#   facet_wrap(.~variable,nrow = 5,ncol = 4) + geom_boxplot() + 
+#   theme(legend.position='none',axis.text.x = element_text(angle = 90))
+# 
+# ggplot(melt(others1[,c(1,2,25:34)], id=c('ID','Study','new.group')),
+#        aes(x=new.group,y=value, colour=new.group)) +
+#   facet_wrap(.~variable,nrow = 3,ncol = 4) + geom_boxplot() + 
+#   theme(legend.position='none',axis.text.x = element_text(angle = 90))
+# 
+# ggplot(melt(others1[,c(1,2,25:34)], id=c('ID','Study','new.group')),
+#        aes(x=new.group,y=value, colour=new.group)) +
+#   facet_wrap(.~variable,nrow = 3,ncol = 4) + geom_boxplot() + 
+#   theme(legend.position='none',axis.text.x = element_text(angle = 90)) +
+#   ylim(c(0,0.3))
+```
+
+## Figure ADHD vs HC  Latent {.tabset}
+```{r,message=FALSE, warning=FALSE}
+library(ggpubr)
+
+theme_set(theme_pubr())
+nyu$DFC[abs(nyu$DFC)>6]<-NA
+
+drawplot<-function(var,ylabstr = '',tmp.range=NULL){
+  tmp1 = rct2 %>% rename(yy = var)
+  tmp2 = abcd %>% rename(yy = var)
+  tmp3 = nyu %>% rename(yy=var)
+  if(is.null(tmp.range)){tmp.range = range(c(tmp1$yy,tmp2$yy, tmp3$yy)*(1.01))}
+print(tmp.range)
+fig<-grid.arrange(
+  ggplot(tmp1  %>% filter(Time=='T1') %>%
+  mutate(Study = factor(Study, levels=c('RCT','NYSPI'))), 
+         aes(x=Study,y=yy,colour=Study,color_palette='BuBr')) + 
+     geom_boxplot(outlier.shape = NA) +geom_jitter(alpha=0.8) + 
+  #facet_grid(.~Study, scales='free_x') + 
+ theme(legend.position='none', 
+                          axis.text.x = element_text(face="bold", size=14),
+                          axis.text.y = element_text(size=14),
+                          strip.text.x = element_text(size = 12)) + 
+  scale_x_discrete(labels=c('ADHD','HC'))+
+  xlab('') + ylab(ylabstr)+
+   scale_color_brewer(palette =  "Set1"),
+  ggplot(tmp3, aes(x=Group,y=yy,colour=Group)) + 
+    geom_boxplot(outlier.shape = NA) + geom_jitter(alpha=0.8)+
+  #facet_grid(.~Study, scales='free_y') + 
+ theme(#axis.text.y = element_blank(),
+       legend.position='none', 
+                           axis.text.x = element_text(face="bold", size=14),
+                          strip.text.x = element_text(size = 12)) + 
+    #scale_fill_brewer(type="qual", palette="Accent", name="Diamond carat")+
+    xlab('') + ylab('')+
+      scale_color_brewer(palette =  "Set1"),
+  
+ widths = c(3,3))
+return(fig)
+}
+
+a<-drawplot(var='thalamus.SFC',ylabstr = 'Thalamus Static SFC')
+b<-drawplot(var='striatum.SFC',ylabstr = 'Striatum SFC')
+c<-drawplot(var='DFC',ylabstr = ' Dynamic FC')
+library(ggplot2)
+pdf("/Users/posnerlab/Dropbox (NYSPI)/ITA_Manuscript/Figure/Latent_ADHD_vs_HC.pdf") 
+
+figure <- ggarrange(b,a,c,
+                    labels = c("(A)", "(B)", "(C)"),
+                    ncol = 2,nrow=2)
+
+figure
+dev.off() 
+
+```
+
+
+
+# Demographics {.tabset}
+
+```{r}
+table1(~Age+Gender|Study*Group,others1 %>% filter(Study!='RCT'),overall=F )
+library(Gmisc)
+t.test(Age ~Group,others1 %>% filter(Study=='ABCD'))
+others1$Gender=factor(others1$Gender)
+others1$Study=factor(others1$Study)
+others1$Group=factor(others1$Group)
+
+dat <-others1 %>% filter(Study=='ABCD')
+chisq.test(dat$Group,dat$Gender)
+
+```
+
+
+
+# Effect sizes {.tabset}
+
+## 1. HC vs. RCT both groups at baseline
+```{r}
+library(effsize)
+
+tmpdat = rct2 %>% filter(Time=='T1') %>%
+  mutate(Study = factor(Study, levels=c('RCT','NYSPI')))
+table1(~thalamus.SFC + DFC + striatum.SFC  + Group | Study,tmpdat)
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Study, tmpdat)')))
+          eval(parse(text=paste('fit<-t.test(',x,'~ Study, tmpdat)')))
+            data.frame(var=x,fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+chisq.test(tmpdat$Study,tmpdat$Gender)
+t.test(Age ~ Study,tmpdat)
+table1(~Age+Gender | Study,tmpdat,overall=F)
+```
+
+
+## 2. ADHD NYU: ADHD vs. HC
+
+* All
+```{r}
+table1(~thalamus.SFC + DFC + striatum.SFC  |Group,nyu, overall=F)
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, nyu)')))
+             eval(parse(text=paste('fit<-t.test(',x,'~ Group, nyu)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+
+```
+
+* Excluding outliers
+```{r}
+tmpdat=nyu
+tmpdat$DFC[abs(tmpdat$DFC)>6]<-NA
+table1(~thalamus.SFC + DFC + striatum.SFC |Group,tmpdat, overall=F)
+
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, tmpdat)')))
+            eval(parse(text=paste('fit<-t.test(',x,'~ Group, tmpdat)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+
+```
+
+
+
+## 3. RCT effect size (Medication effect)
+```{r}
+library(effsize)
+library(lme4)
+library(sjstats)
+tmpdat = rct2 %>% filter(Study=='RCT')
+table1(~thalamus.SFC +DFC + striatum.SFC |Group*Time,tmpdat, overall=F)
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('fit<-lmer(',x,'~ Group*Time + (1|ID), tmpdat)')))
+            data.frame(var=x,F=anova(fit)$'F value'[3], p=anova(fit)$'Pr(>F)'[3],
+                       Eta=eta_sq(fit)[3,2],
+                      d=fixef(fit)[4]/(fit@sigma), 
+                       CI=t(confint(fit, method="Wald")[6,])/(fit@sigma))}))
+
+
+# Premedication
+study1_pre<-tmpdat %>% filter(Time=='T1')
+#t.test(DFC~Group,study1_pre)
+
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+           eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, study1_pre)')))
+            eval(parse(text=paste('fit<-t.test(',x,'~ Group, study1_pre)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+       
+       
+
+# Post Medication 
+study1_post<-tmpdat %>% filter(Time=='T2')
+#t.test(DFC~Group,study1_pre)
+
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+              eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, study1_post)')))
+            eval(parse(text=paste('fit<-t.test(',x,'~ Group, study1_post)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+          
+          
+```
+
+## 4. RCT Med vs non-med 
+```{r}
+tmpdat<-rct2  %>% filter(Study=='RCT') %>%
+  subset(!(Group=='Placebo' & Time=='T2'))
+table1(~thalamus.SFC + DFC + striatum.SFC  | Time,tmpdat, overall=F)
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Time, tmpdat)')))
+             eval(parse(text=paste('fit<-t.test(',x,'~ Time, tmpdat)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+
+```
+## 5. ABCD Medication effect (Medicated vs Not)
+
+* All
+```{r}
+#abcd = abcd %>% mutate(Group=factor(Group, levels=c('Med.','No Med.')))
+table1(~thalamus.SFC + DFC + striatum.SFC  |Group,abcd, overall=F)
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, abcd)')))
+            eval(parse(text=paste('fit<-t.test(',x,'~ Group, abcd)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+```
+
+
+## 5. ABCD Medication effect (Medicated vs Not) Matched 
+
+* All
+```{r}
+#abcd = abcd %>% mutate(Group=factor(Group, levels=c('Med.','No Med.')))
+
+table1(~thalamus.SFC + DFC + striatum.SFC |Group,abcd[index1,], overall=F)
+aa=abcd[index1,]
+do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+          function(x){
+            eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, aa)')))
+            eval(parse(text=paste('fit<-t.test(',x,'~ Group, aa)')))
+            data.frame(var=x,t=fit$statistic,p=fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+```
+
+* Excluding outliers
+```{r}
+# tmpdat=abcd
+# tmpdat$DFC[abs(tmpdat$DFC)>6]<-NA
+# table1(~thalamus.SFC + DFC + striatum.SFC |Group,tmpdat, overall=F)
+# 
+# do.call(rbind,lapply(c('thalamus.SFC','striatum.SFC','DFC'),
+#           function(x){
+#             eval(parse(text=paste('dd<-cohen.d(',x,'~ Group, tmpdat)')))
+#              eval(parse(text=paste('fit<-t.test(',x,'~ Group, tmpdat)')))
+#             data.frame(var=x,fit$p.value,d = dd$estimate, CI=t(dd$conf.int))}))
+
+```
+
+
+## ABCD  
+```{r,fig.width=12,message=FALSE, warning=FALSE}
+library(ggpubr)
+library(wesanderson)
+
+theme_set(theme_pubr())
+abcd2=abcd
+#abcd2$DFC[abs(abcd2$DFC)>]<-NA
+drawplot<-function(var,ylabstr = '',tmp.range=NULL){
+  tmp1 = rct2 %>% rename(yy = var)
+  tmp2 = abcd2 %>% rename(yy = var)
+  tmp3 = nyu %>% rename(yy=var)
+  if(is.null(tmp.range)){tmp.range = range(c(tmp1$yy,tmp2$yy, tmp3$yy)*(1.01))}
+print(tmp.range)
+fig<-grid.arrange(
+  ggplot(tmp1  %>% filter(Study=='RCT') %>%
+  subset(!(Group=='Placebo' & Time=='T2')), 
+         aes(x=Time,y=yy,color=Time)) + 
+     geom_boxplot(outlier.size=-1,
+                  color='black') +geom_jitter(alpha=0.8) + 
+  #facet_grid(.~Study, scales='free_x') + 
+ theme(legend.position='none', 
+                          axis.text.x = element_text(face="bold", size=12),
+                          axis.text.y = element_text(size=14),
+                          strip.text.x = element_text(size = 12)) + 
+  scale_x_discrete(labels=c('No Med','Med'))+
+  xlab('') + ylab(ylabstr),
+
+ 
+  ggplot(tmp2, aes(x=Group,y=yy,colour=Group)) + 
+    geom_boxplot(outlier.shape = NA,color='black') + geom_jitter(alpha=0.8)+
+  #facet_grid(.~Study, scales='free_y') + 
+ theme(legend.position='none', 
+                           axis.text.x = element_text(face="bold", size=12),
+                          strip.text.x = element_text(size = 12)) + 
+    #scale_fill_brewer(type="qual", palette="Accent", name="Diamond carat")+
+    xlab('') + ylab('')+
+     scale_x_discrete(labels=c('No Med','Med')),
+   
+ widths = c(3,3))
+return(fig)
+}
+
+a<-drawplot(var='thalamus.SFC',ylabstr = 'Thalamic Static FC')
+b<-drawplot(var='striatum.SFC',ylabstr = 'Striatal static FC')
+c<-drawplot(var='DFC',ylabstr = ' Dynamic FC')
+library(ggplot2)
+pdf("/Users/posnerlab/Dropbox (NYSPI)/ITA_Manuscript/Figure/Latent_ABCD_update.pdf") 
+
+figure <- ggarrange(b,a,c,
+                    labels = c("(A)", "(B)", "(C)"),
+                    ncol = 2,nrow=2)
+
+figure
+dev.off() 
+
+```
